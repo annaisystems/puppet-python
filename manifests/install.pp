@@ -23,7 +23,36 @@ class python::install {
   }
 
   package { $pythondev: ensure => $dev_ensure }
-  package { 'python-pip': ensure => $pip_ensure }
+  #package { 'python-pip': ensure => $pip_ensure }
+
+  # TODO : need to clean this up, it's too much of a hack right now
+  # TODO : need to extend pip install with easy_install to other platforms
+  if ($pip_ensure) {
+    case $operatingsystem {
+      'CentOS': {
+        if !defined(Package['python-setuptools']) {
+          package { 'python-setuptools':
+            ensure => present,
+          }
+        }
+
+        Package['python-setuptools']
+        ->
+        package { 'python-pip':
+          ensure => absent,
+        }
+        ->
+        # TODO : this should ideally be checking the pip version
+        exec { 'install latest pip':
+          command     => 'easy_install pip',
+          creates     => '/usr/bin/pip',
+        }
+      }
+      default: {
+        package { 'python-pip': ensure => $pip_ensure }
+      }
+    }
+  }
 
   $venv_ensure = $python::virtualenv ? {
     true    => present,
