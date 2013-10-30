@@ -1,64 +1,93 @@
 class python::install {
 
-  $python = $python::version ? {
-    'system' => 'python',
-    default  => "python${python::version}",
+  # TODO : it would be good to have a way to install python 2.7 on CentOS 6.4 at some point
+  $package_ensure = $python::version ? {
+    'system' => 'present',
+    default  => $python::version,
   }
 
   $pythondev = $::operatingsystem ? {
-    /(?i:RedHat|CentOS|Fedora)/ => "${python}-devel",
-    /(?i:Debian|Ubuntu)/        => "${python}-dev"
+    /(?i:RedHat|CentOS|Fedora)/ => "python-devel",
+    /(?i:Debian|Ubuntu)/        => "python-dev"
   }
 
-  package { $python: ensure => present }
+  package { 'python':
+    ensure => $package_ensure,
+  }
 
   $dev_ensure = $python::dev ? {
     true    => present,
     default => absent,
   }
 
-  $pip_ensure = $python::pip ? {
-    true    => present,
-    default => absent,
+  $pip_ensure = $python::pip_version ? {
+    present => "pip -U",
+    default => "pip==${python::pip_version} -U"
+  }
+
+  $setuptools_ensure = $python::setuptools_version ? {
+    present => "setuptools -U",
+    default => "setuptools==${python::setuptools_version} -U"
   }
 
   package { $pythondev: ensure => $dev_ensure }
   #package { 'python-pip': ensure => $pip_ensure }
 
-  # TODO : need to clean this up, it's too much of a hack right now
-  # TODO : need to extend pip install with easy_install to other platforms
-  if ($pip_ensure) {
+  # bootstrap setuptools if it doesn't exist
+  exec { 'download ez_setup':
+    command => 'curl -o /tmp/ez_setup.py https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py',
+    unless  => 'test -f /usr/bin/easy_install',
+  }
+  ->
+  exec { 'bootstrap setuptools':
+    command => 'python /tmp/ez_setup.py',
+    creates => '/usr/bin/easy_install',
+  }
+
+  if $python::pip {
+    exec { 'bootstrap pip':
+      command   => 'easy_install pip',
+      creates   => '/usr/bin/pip',
+      unless    => 'test -f /usr/bin/pip -o -f /usr/bin/pip-python',
+      subscribe => Exec['bootstrap setuptools'],
+    }
+
+    # NOTE : This will probably always fail if pip_version is not explicitly set...
+    exec { 'pypi-pip':
+      command => "pip install ${pip_ensure}",
+      unless  => "test ${python::pip_version} == `pip show pip | grep Version | cut -c 10-`"
+    }
+    exec { 'pypi-setuptools':
+      command => "pip install ${setuptools_ensure}",
+      unless  => "test ${python::setuptools_version} == `pip show setuptools | grep Version | cut -c 10-`"
+    }
+
     case $operatingsystem {
       'CentOS': {
-        if !defined(Package['python-setuptools']) {
-          package { 'python-setuptools':
-            ensure => present,
-          }
-        }
-
-        Package['python-setuptools']
+        Exec['bootstrap pip']
         ->
-        package { 'python-pip':
-          ensure => absent,
+        file { 'pip-python fix':
+          path   => '/usr/bin/pip-python',
+          ensure => link,
+          target => '/usr/bin/pip',
         }
         ->
-        # TODO : this should ideally be checking the pip version
-        exec { 'install latest pip':
-          command     => 'easy_install pip',
-          creates     => '/usr/bin/pip',
-        }
+        Exec['pypi-setuptools']
         ->
-        exec { 'pip-python alternative':
-          command     => 'alternatives --install /usr/bin/pip-python pip-python /usr/bin/pip 1',
-          subscribe   => Exec['install latest pip'],
-          unless      => 'which pip-python'
-        }
+        Exec['pypi-pip']
       }
       default: {
-        package { 'python-pip': ensure => $pip_ensure }
+        Exec['bootstrap pip']
+        ->
+        Exec['pypi-setuptools']
+        ->
+        Exec['pypi-pip']
       }
     }
   }
+
+  # TODO : need to clean this up, it's too much of a hack right now
+  # TODO : need to extend pip install with easy_install to other platforms
 
   $venv_ensure = $python::virtualenv ? {
     true    => present,

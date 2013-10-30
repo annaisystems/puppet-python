@@ -10,6 +10,12 @@
 # [*pip*]
 #  Install python-pip. Default: false
 #
+# [*pip_version*]
+#  Install a specific version of pip.  Default: present
+#
+# [*setuptools_version*]
+#  Install a specific version of setuptools.  Default: present
+#
 # [*dev*]
 #  Install python-dev. Default: false
 #
@@ -34,11 +40,13 @@
 # Sergey Stankevich
 #
 class python (
-  $version    = 'system',
-  $pip        = false,
-  $dev        = false,
-  $virtualenv = false,
-  $gunicorn   = false
+  $version            = 'system',
+  $pip                = false,
+  $pip_version        = present,
+  $setuptools_version = present,
+  $dev                = false,
+  $virtualenv         = false,
+  $gunicorn           = false
 ) {
 
   # Module compatibility check
