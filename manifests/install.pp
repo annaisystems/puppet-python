@@ -47,6 +47,12 @@ class python::install {
           command     => 'easy_install pip',
           creates     => '/usr/bin/pip',
         }
+        ->
+        exec { 'pip-python alternative':
+          command     => 'alternatives --install /usr/bin/pip-python pip-python /usr/bin/pip 1',
+          subscribe   => Exec['install latest pip'],
+          unless      => 'which pip-python'
+        }
       }
       default: {
         package { 'python-pip': ensure => $pip_ensure }
