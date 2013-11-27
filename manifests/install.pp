@@ -33,9 +33,14 @@ class python::install {
   package { $pythondev: ensure => $dev_ensure }
   #package { 'python-pip': ensure => $pip_ensure }
 
+  $download_command = $::operatingsystem ? {
+    /(?i:RedHat|CentOS|Fedora)/ => 'curl -o',
+    /(?i:Debian|Ubuntu)/        => 'wget -O'
+  }
+
   # bootstrap setuptools if it doesn't exist
   exec { 'download ez_setup':
-    command => 'curl -o /tmp/ez_setup.py https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py',
+    command => "${download_command} /tmp/ez_setup.py https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py",
     unless  => 'test -f /usr/bin/easy_install',
   }
   ->
