@@ -55,9 +55,15 @@ class python (
     fail("Module is not compatible with ${::operatingsystem}")
   }
 
-  Class['python::install'] -> Class['python::config']
-
   include python::install
   include python::config
+
+  anchor { 'python::start': }
+  ->
+  Class['python::install']
+  ->
+  Class['python::config']
+  ->
+  anchor { 'python::end': }
 
 }
