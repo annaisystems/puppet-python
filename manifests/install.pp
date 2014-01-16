@@ -41,12 +41,13 @@ class python::install {
   # bootstrap setuptools if it doesn't exist
   exec { 'download ez_setup':
     command => "${download_command} /tmp/ez_setup.py https://bitbucket.org/pypa/setuptools/raw/bootstrap/ez_setup.py",
-    unless  => 'test -f /usr/bin/easy_install',
+    unless  => 'test -f /usr/bin/easy_install && (/usr/bin/easy_install --version | grep setuptools)',
+    notify  => Exec['bootstrap setuptools'],
   }
   ->
   exec { 'bootstrap setuptools':
-    command => 'python /tmp/ez_setup.py',
-    creates => '/usr/bin/easy_install',
+    command     => 'python /tmp/ez_setup.py',
+    refreshonly => true,
   }
 
   if $python::pip {
